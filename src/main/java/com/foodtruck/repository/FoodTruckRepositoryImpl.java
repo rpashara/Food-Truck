@@ -1,28 +1,39 @@
 package com.foodtruck.repository;
 
 import com.foodtruck.bean.FoodTruck;
+import com.foodtruck.exception.DataException;
+import com.foodtruck.exception.DataNotFoundException;
+import com.foodtruck.exception.RestOperationException;
+import com.foodtruck.util.ObservableLogHelper;
 import com.foodtruck.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.stereotype.Repository;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 import rx.Observable;
 import rx.Subscriber;
+import rx.schedulers.Schedulers;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+@Repository
 public class FoodTruckRepositoryImpl implements FoodTruckRepository {
 
+    @Autowired
    private RestTemplate restTemplate;
 
     private static final transient Logger LOGGER = LoggerFactory.getLogger(FoodTruckRepositoryImpl.class);
-
-    @Autowired
-    public void setRestTemplate(RestTemplate restTemplate) {
-        this.restTemplate = restTemplate;
-    }
-
 
     @Value("${externalserverpath}")
     private String externalServerPath;
@@ -31,45 +42,26 @@ public class FoodTruckRepositoryImpl implements FoodTruckRepository {
     private String location;
 
     @Override
-    public FoodTruck getNearFoodTrucks(String latitude, String longitude, String radius) {
-        return Observable.create((Subscriber<? super Optinal<FoodTruck>> subscrber) ->{
-            try {
-                final static String  url = externalServerPath + "(" + location +  StringUtils.COMMA + latitude + StringUtils.COMMA + longitude + StringUtils.COMMA+ radius + ")";
-                FoodTruck foodTruck = restTemplate.exchange(url, HttpMethod.GET,new HttpEntity<Object>(), FoodTruck.class);
-            }
-        });
+    public Observable<Optional<FoodTruck>> getNearFoodTrucks(String latitude, String longitude, String radius, boolean useFallback) {
 
-       /* try{
-            HttpEntity<Object> requestEntity = new HttpEntity<>();
-            FoodTruck foodTruck = restTemplate.exchange( externalServerPath + "(" + location +  "," + latitude +"," + longitude + ","+ radius + ")",
-                    HttpMethod.GET,requestEntity,FoodTruck.class).getBody();
-            if (foodTruck != null) {
-
-            }
-        }
-*/
-
-        return null;
-
-     /*   return Observable.create((Subscriber<? super Optional<SuccessMessage>> subscriber) -> {
+        return Observable.create((Subscriber<? super Optional<FoodTruck>> subscriber) ->{
             try {
                 if (!subscriber.isUnsubscribed()) {
-                    final String adjustmentUrl = csApiEndPoints.getCsapiServerPath() + csApiEndPoints.getAccounts() + customerKey + csApiEndPoints.getAdjustment();
+                    final String url = externalServerPath + "(" + location + StringUtils.COMMA + latitude + StringUtils.COMMA + longitude + StringUtils.COMMA + radius + ")";
+                    HttpHeaders requestHeaders = new HttpHeaders();
+                    List<MediaType> mediaTypeList = new ArrayList<MediaType>();
+                    mediaTypeList.add(MediaType.APPLICATION_JSON);
+                    requestHeaders.setAccept(mediaTypeList);
+                    requestHeaders.setContentType(MediaType.APPLICATION_JSON);
 
-
-                    AdjustmentJsonEntity adjustmentJsonEntity = new AdjustmentJsonEntity();
-                    adjustmentJsonEntity.setAdjustment(adjustment);
-
-                    HttpEntity<AdjustmentJsonEntity> requestEntity = new HttpEntity<AdjustmentJsonEntity>(adjustmentJsonEntity, HttpUtils.getRestRequestHttpHeader(authorization));
-                    ParameterizedTypeReference<GenericSuccessEntity> responseType = new ParameterizedTypeReference<GenericSuccessEntity>() {};
-                    GenericSuccessEntity genericSuccessEntity  = restTemplate.exchange(adjustmentUrl, HttpMethod.POST, requestEntity, responseType).getBody();
-
-                    if(genericSuccessEntity != null && genericSuccessEntity.getSuccessMessage() != null){
-                        subscriber.onNext(Optional.of(genericSuccessEntity.getSuccessMessage()));
+                    HttpEntity<Object> requestEntity = new HttpEntity<Object>(requestHeaders);
+                    FoodTruck foodTruck = restTemplate.exchange(url, HttpMethod.GET, requestEntity,FoodTruck.class).getBody();
+                    if (foodTruck != null) {
+                        subscriber.onNext(Optional.of(foodTruck));
                     }
                 }
-            } catch (Exception ex) {
-                LOGGER.debug("Error while make adjustment.",ex);
+            }catch (Exception ex){
+
                 if(ex instanceof ResourceAccessException || ex instanceof HttpClientErrorException || ex instanceof HttpServerErrorException){
                     subscriber.onError(new RestOperationException("Error occurred during rest operations.", ex));
                 }else{
@@ -80,10 +72,10 @@ public class FoodTruckRepositoryImpl implements FoodTruckRepository {
                     subscriber.onCompleted();
                 }
             }
-        }).doOnEach(ObservableLogHelper.log(LOGGER, "adjustment for  " + customerKey + " is done sucessfully " ))
-                .switchIfEmpty(Observable.error(new DataException("Input data is invalid.")))
+        }).doOnEach(ObservableLogHelper.log(LOGGER, "food truck data retrieved successfully."))
+                .switchIfEmpty(Observable.error(new DataNotFoundException("No food trucks are available near given location.")))
                 .subscribeOn(Schedulers.io())
                 .observeOn(Schedulers.io());
-    }*/
     }
 }
+

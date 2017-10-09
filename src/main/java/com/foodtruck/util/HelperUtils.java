@@ -1,5 +1,8 @@
 package com.foodtruck.util;
 
+import com.foodtruck.bean.FoodTruck;
+import com.foodtruck.bean.FoodTruckBean;
+
 public class HelperUtils {
 
     /**
@@ -29,5 +32,15 @@ public class HelperUtils {
 
     private static double rad2deg(double rad) {
         return (rad * 180.0 / Math.PI);
+    }
+
+    public static FoodTruckBean convertFoodTruckToFoodTruckBean(FoodTruck foodTruck){
+
+        FoodTruckBean foodTruckBean = new FoodTruckBean();
+        foodTruckBean.setAddress(foodTruck.getAddress());
+        foodTruckBean.setApplicant(foodTruck.getApplicant());
+        foodTruckBean.setApproved(foodTruck.getApproved());
+        foodTruckBean.setDaysHours(foodTruck.getDaysHours());
+
     }
 }
