@@ -1,7 +1,7 @@
 package com.foodtruck.repository;
 
 import com.foodtruck.bean.FoodTruck;
-import com.foodtruck.exception.DataException;
+import com.foodtruck.bean.FoodTruckJsonEntity;
 import com.foodtruck.exception.DataNotFoundException;
 import com.foodtruck.exception.RestOperationException;
 import com.foodtruck.util.ObservableLogHelper;
@@ -30,10 +30,15 @@ import java.util.Optional;
 @Repository
 public class FoodTruckRepositoryImpl implements FoodTruckRepository {
 
-    @Autowired
    private RestTemplate restTemplate;
 
     private static final transient Logger LOGGER = LoggerFactory.getLogger(FoodTruckRepositoryImpl.class);
+
+    @Autowired
+    public void setRestTemplate(RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
+    }
+
 
     @Value("${externalserverpath}")
     private String externalServerPath;
@@ -42,29 +47,29 @@ public class FoodTruckRepositoryImpl implements FoodTruckRepository {
     private String location;
 
     @Override
-    public Observable<Optional<FoodTruck>> getNearFoodTrucks(String latitude, String longitude, String radius, boolean useFallback) {
+    public  Observable<Optional<List<FoodTruck>>> getNearFoodTrucks(String latitude, String longitude, String radius, boolean useFallBack) {
 
-        return Observable.create((Subscriber<? super Optional<FoodTruck>> subscriber) ->{
+        return Observable.create((Subscriber<? super Optional<List<FoodTruck>>> subscriber) -> {
             try {
                 if (!subscriber.isUnsubscribed()) {
-                    final String url = externalServerPath + "(" + location + StringUtils.COMMA + latitude + StringUtils.COMMA + longitude + StringUtils.COMMA + radius + ")";
+
                     HttpHeaders requestHeaders = new HttpHeaders();
                     List<MediaType> mediaTypeList = new ArrayList<MediaType>();
                     mediaTypeList.add(MediaType.APPLICATION_JSON);
                     requestHeaders.setAccept(mediaTypeList);
                     requestHeaders.setContentType(MediaType.APPLICATION_JSON);
-
                     HttpEntity<Object> requestEntity = new HttpEntity<Object>(requestHeaders);
-                    FoodTruck foodTruck = restTemplate.exchange(url, HttpMethod.GET, requestEntity,FoodTruck.class).getBody();
-                    if (foodTruck != null) {
-                        subscriber.onNext(Optional.of(foodTruck));
+
+                    FoodTruckJsonEntity foodTruckJsonEntity = restTemplate.exchange(externalServerPath + "(" + location + "," + latitude + "," + longitude + "," + radius + ")", HttpMethod.GET, requestEntity, FoodTruckJsonEntity.class).getBody();
+                    if (foodTruckJsonEntity != null && foodTruckJsonEntity.getFoodTrucks() != null) {
+                        subscriber.onNext(Optional.of(foodTruckJsonEntity.getFoodTrucks()));
                     }
                 }
-            }catch (Exception ex){
-
-                if(ex instanceof ResourceAccessException || ex instanceof HttpClientErrorException || ex instanceof HttpServerErrorException){
+            } catch (Exception ex) {
+                LOGGER.debug("Error while retrieving food truck list.", ex);
+                if (ex instanceof ResourceAccessException || ex instanceof HttpClientErrorException || ex instanceof HttpServerErrorException) {
                     subscriber.onError(new RestOperationException("Error occurred during rest operations.", ex));
-                }else{
+                } else {
                     subscriber.onError(ex);
                 }
             } finally {
@@ -72,10 +77,12 @@ public class FoodTruckRepositoryImpl implements FoodTruckRepository {
                     subscriber.onCompleted();
                 }
             }
-        }).doOnEach(ObservableLogHelper.log(LOGGER, "food truck data retrieved successfully."))
-                .switchIfEmpty(Observable.error(new DataNotFoundException("No food trucks are available near given location.")))
+
+
+        }).doOnEach(ObservableLogHelper.log(LOGGER, "retrieved food truck list."))
+                .switchIfEmpty(Observable.error(new DataNotFoundException("No data retrieved.")))
                 .subscribeOn(Schedulers.io())
                 .observeOn(Schedulers.io());
+
     }
 }
-

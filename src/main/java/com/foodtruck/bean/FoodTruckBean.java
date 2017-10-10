@@ -3,7 +3,9 @@ package com.foodtruck.bean;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
-
+/**
+ * Created by rpashara on 9/9/2017.
+ */
 @JsonInclude(value = JsonInclude.Include.NON_NULL)
 @Data
 public class FoodTruckBean{
@@ -54,14 +56,7 @@ public class FoodTruckBean{
     @JsonProperty("status")
     private String status;
 
-
-    /*public boolean isApproved(){
-        // TODO: 10/8/2017 check for APPROVED status
-        return true;
-    }
-
-    private String[] getFoodItems() {
-        return this.fooditems.split(":");
-    }*/
+    @JsonProperty("distance")
+    private long distance;
 
 }

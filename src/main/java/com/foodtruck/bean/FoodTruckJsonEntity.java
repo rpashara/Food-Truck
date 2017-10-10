@@ -6,21 +6,16 @@ import lombok.Data;
 
 import java.util.List;
 
+/**
+ * Created by rpashara on 9/9/2017.
+ */
 @JsonInclude(value = JsonInclude.Include.NON_NULL)
 @Data
-public class ResponseEntity<T> {
+public class FoodTruckJsonEntity {
 
-    @JsonProperty("status")
-    private String status;
-
-    @JsonProperty("responseMessage")
-    private String responseMessage;
-
-    @JsonProperty("data")
-    private T data;
+    @JsonProperty("foodTrucks")
+    List<FoodTruck> foodTrucks;
 
     @JsonProperty("errors")
     private List<ErrorJsonBean.ErrorBean> errors;
-
-
 }

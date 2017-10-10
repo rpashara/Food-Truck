@@ -4,11 +4,17 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.commons.lang3.StringUtils;
 import lombok.Data;
+import org.springframework.context.annotation.Bean;
 
 import java.util.List;
 
+/**
+ * Created by rpashara on 9/9/2017.
+ */
+
 @JsonInclude(value = JsonInclude.Include.NON_NULL)
 @Data
+
 public  class ErrorJsonBean {
 
     private List<ErrorBean> errors;

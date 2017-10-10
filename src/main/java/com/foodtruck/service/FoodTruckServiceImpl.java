@@ -2,6 +2,7 @@ package com.foodtruck.service;
 
 import com.foodtruck.bean.FoodTruckBean;
 import com.foodtruck.repository.FoodTruckRepository;
+import com.foodtruck.util.HelperUtils;
 import com.netflix.hystrix.HystrixCommandGroupKey;
 import com.netflix.hystrix.HystrixCommandKey;
 import com.netflix.hystrix.HystrixObservableCommand;
@@ -12,101 +13,67 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import rx.Observable;
 
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.DoubleSummaryStatistics;
+import java.util.List;
 import java.util.Optional;
 
-@Service
-public class FoodTruckServiceImpl implements FoodTruckService{
+/**
+ * Created by rpashara on 10/9/2017.
+ */
 
-    private static final HystrixCommandGroupKey hystrixCommandGroupKey = HystrixCommandGroupKey.Factory
-            .asKey("FoodTruckServiceImpl");
-    private static final transient Logger log = LoggerFactory
-            .getLogger(FoodTruckServiceImpl.class);
+@Service
+public class FoodTruckServiceImpl implements FoodTruckService {
+
+
+    @Value("${small.radius}")
+    private String smallRadius;
+
+    @Value("${large.radius}")
+    private String largeRadius;
 
     @Autowired
     private FoodTruckRepository foodTruckRepository;
 
-    @Value("${small.radius")
-    private String smallRadius;
+    private static final transient Logger LOGGER = LoggerFactory.getLogger(FoodTruckServiceImpl.class);
 
-    @Value("${large.radius}")
-    private  String largeRadius;
+    private static final HystrixCommandGroupKey hystrixCommandGroupKey = HystrixCommandGroupKey.Factory
+            .asKey("FoodTruckServiceImpl");
 
     @Override
-    public Observable<Optional<FoodTruckBean>> getNearFoodTrucksAsync(String latitude, String longitude){
+    public Observable<Optional<List<FoodTruckBean>>> getNearFoodTrucksAsync(String latitude, String longitude) {
 
-        return new HystrixObservableCommand<Optional<FoodTruckBean>>(
+        return new HystrixObservableCommand<Optional<List<FoodTruckBean>>>(
                 HystrixObservableCommand.Setter.withGroupKey(
                         hystrixCommandGroupKey).andCommandKey(
-                        HystrixCommandKey.Factory.asKey("getNearFoodTrucksAsync"))) {
+                        HystrixCommandKey.Factory.asKey("createCustomerAsync"))) {
 
             @Override
-            protected Observable<Optional<FoodTruckBean>> construct() {
-                log.debug("Calling construct method of hystrix command:AdjustmentService.getNearFoodTrucksAsync");
-                return getNearFoodTrucksWithRadius(smallRadius,false);
+            protected Observable<Optional<List<FoodTruckBean>>> construct() {
+                return getNearFoodTrucks(smallRadius, false);
             }
 
             @Override
-            protected Observable<Optional<FoodTruckBean>> resumeWithFallback() {
-                log.debug("Calling resumeWithFallback method of hystrix command:AdjustmentService.getNearFoodTrucksAsync");
-                return getNearFoodTrucksWithRadius(largeRadius,true);
+            protected Observable<Optional<List<FoodTruckBean>>> resumeWithFallback() {
+                return getNearFoodTrucks(largeRadius, true);
             }
 
-            private Observable<Optional<FoodTruckBean>> getNearFoodTrucksWithRadius(String radius, boolean useFallBack) {
+            protected Observable<Optional<List<FoodTruckBean>>> getNearFoodTrucks(String radius, boolean useFallBack) {
+                List<FoodTruckBean> foodTruckBeanList = new ArrayList<>();
+                return foodTruckRepository.getNearFoodTrucks(latitude, longitude, radius, useFallBack)
+                    .map(foodTrucks -> {
+                        foodTrucks.get().stream().forEach(foodTruck -> {
+                            FoodTruckBean foodTruckBean = HelperUtils.convertFoodTruckToFoodTruckBean(foodTruck);
+                            foodTruckBean.setDistance(HelperUtils.getDistance(Double.parseDouble(longitude), Double.parseDouble(latitude),
+                                    Double.parseDouble(foodTruckBean.getLongitude()), Double.parseDouble(foodTruckBean.getLatitude())));
+                            foodTruckBeanList.add(foodTruckBean);
 
-                return  foodTruckRepository.getNearFoodTrucks(latitude,longitude,radius,useFallBack)
-                        .map()
+                        });
+                        return Optional.of(foodTruckBeanList);
+                    });
             }
-
 
         }.toObservable();
-
-/*
-        return new HystrixObservableCommand<Optional<List<AdjustmentAccountCode>>>(
-                HystrixObservableCommand.Setter.withGroupKey(
-                        hystrixCommandGroupKey).andCommandKey(
-                        HystrixCommandKey.Factory.asKey("getAccountCodeListForAdjustmentAsync"))) {
-
-            @Override
-            protected Observable<Optional<List<AdjustmentAccountCode>>> construct() {
-                log.debug("Calling construct method of hystrix command:AdjustmentService.getAccountCodeListForAdjustmentAsync");
-                return getAccountCodeListForAdjustment(false);
-            }
-
-            @Override
-            protected Observable<Optional<List<AdjustmentAccountCode>>> resumeWithFallback() {
-                log.debug("Calling resumeWithFallback method of hystrix command:AdjustmentService.getAccountCodeListForAdjustmentAsync");
-                return getAccountCodeListForAdjustment(true);
-            }
-
-            protected Observable<Optional<List<AdjustmentAccountCode>>> getAccountCodeListForAdjustment(Boolean fallback){
-
-                return Observable.zip(adjustmentRepository.getJournalItemCountByAccountCode(accountId,lateFeeAccountCode,fallback)
-                        ,adjustmentRepository.getJournalItemCountByAccountCode(accountId,lateFeeAdjustmentAccountCode,fallback)
-                        ,accountRepository.getAccount(accountId,fallback)
-                        ,(lateFeeCodeOp, lateFeeAdjustmentCodeOp,accountOp) ->  {
-                            List<String> accountCodesList = new ArrayList<String>();
-                            List<String> lateFeeAdjustmentAllowedCountryList = new ArrayList<>();
-                            for(String countryCode : lateFeeAdjustmentAllowedCountries.split(",")){
-                                lateFeeAdjustmentAllowedCountryList.add(countryCode);
-                            }
-                            accountCodesList.add(billingAdjustmentAccountCode);
-                            if(lateFeeCodeOp.get().compareTo(lateFeeAdjustmentCodeOp.get()) != 0
-                                    && !lateFeeAdjustmentAllowedCountryList.isEmpty()
-                                    && lateFeeAdjustmentAllowedCountryList.contains(accountOp.get().getAccountProfile().getContactAddress().getCountryISOCode())){
-                                accountCodesList.add(lateFeeAdjustmentAccountCode);
-                            }
-                            return accountCodesList;})
-                        .flatMap(accountCodeList -> Observable.zip(adjustmentRepository.getAccountCodeDetailsForAdjustment(accountCodeList, fallback)
-                                ,adjustmentRepository.getJournalLatestItemAmountByAccountCode(accountId,lateFeeAccountCode,fallback)
-                                ,((adjustmentAccountCodes, amount) -> {
-                                    for(AdjustmentAccountCode adjustmentAccountCode : adjustmentAccountCodes.get()){
-                                        if(StringUtils.equals(adjustmentAccountCode.getCode(),lateFeeAdjustmentAccountCode)){
-                                            adjustmentAccountCode.setDefaultAmount(amount.get());
-                                        }
-                                    }
-                                    return  adjustmentAccountCodes;
-                                })));
-            }
-        }.toObservable();*/
     }
 }
